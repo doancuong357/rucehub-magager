@@ -50,6 +50,73 @@ function html(value) {
   })[char]);
 }
 
+// Custom Alert/Confirm System
+const showCustomDialog = ({ title, message, isConfirm = false }) => {
+  return new Promise((resolve) => {
+    const dialog = qs('#custom-alert-dialog');
+    const titleEl = qs('#dialog-title');
+    const msgEl = qs('#dialog-message');
+    const iconEl = qs('#dialog-icon');
+    const cancelBtn = qs('#dialog-btn-cancel');
+    const confirmBtn = qs('#dialog-btn-confirm');
+
+    titleEl.textContent = title;
+    msgEl.textContent = message;
+
+    // Set colors & icons based on title/actions
+    const isDanger = title.includes('Xóa') || title.includes('Hủy');
+    if (isDanger) {
+      qs('.dialog-icon-wrapper').style.backgroundColor = '#fdebeb';
+      iconEl.style.color = '#bf3f2f';
+      iconEl.innerHTML = `<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>`;
+      confirmBtn.className = 'btn btn-primary btn-danger';
+    } else {
+      qs('.dialog-icon-wrapper').style.backgroundColor = '#f1f5ef';
+      iconEl.style.color = '#24372b';
+      iconEl.innerHTML = `<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>`;
+      confirmBtn.className = 'btn btn-primary';
+    }
+
+    if (isConfirm) {
+      cancelBtn.style.display = 'block';
+    } else {
+      cancelBtn.style.display = 'none';
+    }
+
+    dialog.classList.remove('hidden');
+
+    const handleConfirm = () => {
+      dialog.classList.add('hidden');
+      cleanup();
+      resolve(true);
+    };
+
+    const handleCancel = () => {
+      dialog.classList.add('hidden');
+      cleanup();
+      resolve(false);
+    };
+
+    const cleanup = () => {
+      confirmBtn.removeEventListener('click', handleConfirm);
+      cancelBtn.removeEventListener('click', handleCancel);
+    };
+
+    confirmBtn.addEventListener('click', handleConfirm);
+    cancelBtn.addEventListener('click', handleCancel);
+  });
+};
+
+// Override standard alert so it looks premium!
+window.alert = (message) => {
+  showCustomDialog({ title: 'Thông báo', message, isConfirm: false });
+};
+
+window.showConfirmAsync = (title, message) => {
+  return showCustomDialog({ title, message, isConfirm: true });
+};
+
+
 function formData(form) {
   return Object.fromEntries(new FormData(form).entries());
 }
@@ -271,7 +338,7 @@ window.payCustomerDebt = async (id) => {
 };
 
 window.markOrderDone = async (id) => {
-  if (!confirm('Xác nhận thu đủ nợ và hoàn thành đơn hàng này?')) return;
+  if (!(await window.showConfirmAsync('Xác nhận hoàn thành đơn', 'Xác nhận thu đủ nợ và hoàn thành đơn hàng này?'))) return;
   try {
     const order = state.orders.find((o) => o.id === id);
     if (!order) return;
@@ -316,7 +383,7 @@ window.editCustomer = (id) => {
 };
 
 window.deleteProduct = async (id) => {
-  if (!confirm('Bạn có chắc chắn muốn xóa mặt hàng này?')) return;
+  if (!(await window.showConfirmAsync('Xóa mặt hàng', 'Bạn có chắc chắn muốn xóa mặt hàng này?'))) return;
   try {
     await api.delete(`/api/products/${id}`);
     await loadAll();
@@ -326,7 +393,7 @@ window.deleteProduct = async (id) => {
 };
 
 window.deleteCustomer = async (id) => {
-  if (!confirm('Bạn có chắc chắn muốn xóa khách hàng này?')) return;
+  if (!(await window.showConfirmAsync('Xóa khách hàng', 'Bạn có chắc chắn muốn xóa khách hàng này?'))) return;
   try {
     await api.delete(`/api/customers/${id}`);
     await loadAll();

@@ -328,6 +328,25 @@
       </section>
     </main>
 
+    <!-- Custom Modal Confirm/Alert Dialog -->
+    <div id="custom-alert-dialog" class="dialog-overlay hidden">
+      <div class="dialog-container">
+        <div class="dialog-icon-wrapper">
+          <svg id="dialog-icon" class="dialog-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+        </div>
+        <h3 id="dialog-title">Tiêu đề</h3>
+        <p id="dialog-message">Nội dung thông báo ở đây...</p>
+        <div class="dialog-buttons">
+          <button id="dialog-btn-cancel" class="btn btn-secondary">Hủy bỏ</button>
+          <button id="dialog-btn-confirm" class="btn btn-primary">Xác nhận</button>
+        </div>
+      </div>
+    </div>
+
     <script src="/app.js"></script>
   </body>
 </html>

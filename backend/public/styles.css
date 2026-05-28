@@ -723,3 +723,143 @@ textarea {
     grid-template-columns: 1fr;
   }
 }
+
+/* SỬA LỖI SVG ICON TO BỊ BỂ KHUNG TRONG NÚT BẤM */
+button svg,
+.btn-submit svg,
+.primary svg,
+.action-btn svg,
+.ghost svg {
+  width: 18px !important;
+  height: 18px !important;
+  stroke-width: 2.2 !important;
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.ghost svg {
+  width: 15px !important;
+  height: 15px !important;
+}
+
+/* CUSTOM MODAL CONFIRM/ALERT DIALOG */
+.dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(13, 22, 17, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(4px);
+  animation: fadeInOverlay 0.25s ease forwards;
+}
+
+.dialog-overlay.hidden {
+  display: none !important;
+}
+
+.dialog-container {
+  background: #ffffff;
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  width: 90%;
+  max-width: 360px;
+  text-align: center;
+  box-shadow: 0 10px 25px rgba(23, 35, 28, 0.15);
+  border: 1px solid #e2e7dd;
+  animation: scaleInDialog 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.dialog-icon-wrapper {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #f1f5ef;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+
+.dialog-icon {
+  width: 28px;
+  height: 28px;
+}
+
+#dialog-title {
+  color: #17231c;
+  font-size: 18px;
+  font-weight: 800;
+  margin-bottom: 8px;
+  margin-top: 0;
+}
+
+#dialog-message {
+  color: #556057;
+  font-size: 14px;
+  line-height: 20px;
+  margin-bottom: 24px;
+  margin-top: 0;
+}
+
+.dialog-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.dialog-buttons .btn {
+  flex: 1;
+  height: 40px;
+  border-radius: var(--radius-md);
+  border: 0;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dialog-buttons .btn-secondary {
+  background: #f1f3f0;
+  color: #66717d;
+  border: 1px solid #d8ded4;
+}
+
+.dialog-buttons .btn-secondary:hover {
+  background: #e6ede2;
+  color: #2e4e3f;
+}
+
+.dialog-buttons .btn-primary {
+  background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+  color: #ffffff;
+}
+
+.dialog-buttons .btn-primary:hover {
+  transform: translateY(-1px);
+}
+
+.dialog-buttons .btn-danger {
+  background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+}
+
+.dialog-buttons .btn-danger:hover {
+  transform: translateY(-1px);
+}
+
+@keyframes fadeInOverlay {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleInDialog {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}

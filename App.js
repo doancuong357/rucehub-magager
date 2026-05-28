@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Keyboard,
+  KeyboardAvoidingView,
   Linking,
   Modal,
   NativeModules,
@@ -15,6 +17,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 
@@ -48,7 +51,7 @@ const emptyCustomer = {
 const emptyOrder = {
   customerId: '',
   productId: '',
-  quantity: '',
+  quantity: '1',
   paid: '',
   note: '',
 };
@@ -58,27 +61,41 @@ const tabs = [
   { id: 'products', label: 'Mặt hàng', icon: 'rice' },
   { id: 'orders', label: 'Bán hàng', icon: 'cart-outline' },
   { id: 'customers', label: 'Khách hàng', icon: 'account-group-outline' },
-  { id: 'reports', label: 'Báo cáo', icon: 'chart-box-outline' },
+  { id: 'debts', label: 'Thu nợ', icon: 'account-cash-outline' },
 ];
 
 function getDefaultApiUrl() {
-  if (Platform.OS === 'web') {
-    return 'http://localhost:4000';
-  }
-
-  const scriptUrl = NativeModules?.SourceCode?.scriptURL;
-  const host = scriptUrl?.match(/https?:\/\/([^:/]+)/)?.[1];
-  return host ? `http://${host}:4000` : 'http://localhost:4000';
+  return 'https://ricehub-manager.onrender.com';
 }
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [apiUrl, setApiUrl] = useState(getDefaultApiUrl());
   const [apiInput, setApiInput] = useState(getDefaultApiUrl());
+  const [alertConfig, setAlertConfig] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    buttons: [],
+  });
+
+  const showAlert = useCallback((title, message, buttons = []) => {
+    setAlertConfig({
+      visible: true,
+      title,
+      message,
+      buttons,
+    });
+  }, []);
+
+  const hideAlert = useCallback(() => {
+    setAlertConfig((prev) => ({ ...prev, visible: false }));
+  }, []);
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [orders, setOrders] = useState([]);
   const [summary, setSummary] = useState(null);
+  const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -113,16 +130,18 @@ export default function App() {
 
   const loadData = useCallback(async () => {
     setError('');
-    const [nextSummary, nextProducts, nextCustomers, nextOrders] = await Promise.all([
+    const [nextSummary, nextProducts, nextCustomers, nextOrders, nextContacts] = await Promise.all([
       request('/api/summary'),
       request('/api/products'),
       request('/api/customers'),
       request('/api/orders'),
+      request('/api/debt-contacts').catch(() => []),
     ]);
     setSummary(nextSummary);
     setProducts(nextProducts);
     setCustomers(nextCustomers);
     setOrders(nextOrders);
+    setContacts(nextContacts || []);
   }, [request]);
 
   useEffect(() => {
@@ -210,7 +229,7 @@ export default function App() {
   }
 
   async function deleteProduct(product) {
-    Alert.alert('Xóa mặt hàng', `Bạn muốn xóa "${product.name}"?`, [
+    showAlert('Xóa mặt hàng', `Bạn muốn xóa "${product.name}"?`, [
       { text: 'Hủy', style: 'cancel' },
       {
         text: 'Xóa',
@@ -220,7 +239,7 @@ export default function App() {
             await request(`/api/products/${product.id}`, { method: 'DELETE' });
             await refresh();
           } catch (nextError) {
-            Alert.alert('Không thể xóa', nextError.message);
+            showAlert('Không thể xóa', nextError.message);
           }
         },
       },
@@ -228,7 +247,7 @@ export default function App() {
   }
 
   async function deleteCustomer(customer) {
-    Alert.alert('Xóa khách hàng', `Bạn muốn xóa "${customer.name}"?`, [
+    showAlert('Xóa khách hàng', `Bạn muốn xóa "${customer.name}"?`, [
       { text: 'Hủy', style: 'cancel' },
       {
         text: 'Xóa',
@@ -238,7 +257,7 @@ export default function App() {
             await request(`/api/customers/${customer.id}`, { method: 'DELETE' });
             await refresh();
           } catch (nextError) {
-            Alert.alert('Không thể xóa', nextError.message);
+            showAlert('Không thể xóa', nextError.message);
           }
         },
       },
@@ -262,13 +281,27 @@ export default function App() {
       });
       await refresh();
     } catch (nextError) {
-      Alert.alert('Không ghi được lịch sử liên hệ', nextError.message);
+      showAlert('Không ghi được lịch sử liên hệ', nextError.message);
+    }
+  }
+
+  async function recordDebtContactFull(customerId, method, content, promisedDate) {
+    try {
+      await request(`/api/customers/${customerId}/debt-contacts`, {
+        method: 'POST',
+        body: JSON.stringify({ method, content, promisedDate: promisedDate || '', status: 'Đã liên hệ' }),
+      });
+      await refresh();
+      return true;
+    } catch (nextError) {
+      showAlert('Không ghi được lịch sử liên hệ', nextError.message);
+      return false;
     }
   }
 
   async function callCustomer(customer) {
     if (!customer.phone) {
-      Alert.alert('Thiếu số điện thoại', 'Khách hàng này chưa có số điện thoại.');
+      showAlert('Thiếu số điện thoại', 'Khách hàng này chưa có số điện thoại.');
       return;
     }
     await recordDebtContact(customer, 'Gọi điện', `Gọi nhắc công nợ ${money.format(customer.debt)}.`);
@@ -277,7 +310,7 @@ export default function App() {
 
   async function smsCustomer(customer) {
     if (!customer.phone) {
-      Alert.alert('Thiếu số điện thoại', 'Khách hàng này chưa có số điện thoại.');
+      showAlert('Thiếu số điện thoại', 'Khách hàng này chưa có số điện thoại.');
       return;
     }
     const message = `Chào anh/chị ${customer.name}, cửa hàng gạo xin nhắc công nợ hiện tại là ${money.format(customer.debt)}. Anh/chị vui lòng thanh toán giúp em nhé.`;
@@ -293,7 +326,7 @@ export default function App() {
       });
       await refresh();
     } catch (nextError) {
-      Alert.alert('Không thể cập nhật đơn', nextError.message);
+      showAlert('Không thể cập nhật đơn', nextError.message);
     }
   }
 
@@ -397,8 +430,15 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'reports' && (
-            <ReportsTab summary={summary} products={products} customers={customers} orders={orders} />
+          {activeTab === 'debts' && (
+            <DebtsTab
+              summary={summary}
+              customers={customers}
+              contacts={contacts}
+              onRecordContact={recordDebtContactFull}
+              onCall={callCustomer}
+              onSms={smsCustomer}
+            />
           )}
         </ScrollView>
       )}
@@ -408,12 +448,14 @@ export default function App() {
         product={productModal.product}
         onClose={() => setProductModal({ visible: false, product: null })}
         onSave={saveProduct}
+        showAlert={showAlert}
       />
       <CustomerModal
         visible={customerModal.visible}
         customer={customerModal.customer}
         onClose={() => setCustomerModal({ visible: false, customer: null })}
         onSave={saveCustomer}
+        showAlert={showAlert}
       />
       <OrderModal
         visible={orderModal}
@@ -421,12 +463,14 @@ export default function App() {
         customers={customers}
         onClose={() => setOrderModal(false)}
         onSave={createOrder}
+        showAlert={showAlert}
       />
       <PaymentModal
         visible={!!paymentCustomer}
         customer={paymentCustomer}
         onClose={() => setPaymentCustomer(null)}
         onSave={payDebt}
+        showAlert={showAlert}
       />
       <ApiModal
         visible={apiModal}
@@ -437,6 +481,10 @@ export default function App() {
           setApiUrl(apiInput.replace(/\/$/, ''));
           setApiModal(false);
         }}
+      />
+      <AlertModal
+        config={alertConfig}
+        onClose={hideAlert}
       />
     </SafeAreaView>
   );
@@ -558,46 +606,222 @@ function CustomersTab({ customers, search, onSearch, onAdd, onEdit, onDelete, on
   );
 }
 
-function ReportsTab({ summary, products, customers, orders }) {
+function DebtsTab({ summary, customers, contacts, onRecordContact, onCall, onSms }) {
+  const [search, setSearch] = useState('');
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  const [method, setMethod] = useState('Gọi điện');
+  const [promisedDate, setPromisedDate] = useState('');
+  const [content, setContent] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  // Filter customers with debt that match search keyword
+  const filteredCustomers = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+    const list = customers.filter(c => c.debt > 0);
+    if (!keyword) return list;
+    return list.filter(c =>
+      `${c.name} ${c.phone || ''} ${c.address || ''}`.toLowerCase().includes(keyword)
+    );
+  }, [customers, search]);
+
+  // Sync selectedCustomerId if it becomes invalid or not set
+  useEffect(() => {
+    if (filteredCustomers.length > 0) {
+      const exists = filteredCustomers.some(c => String(c.id) === String(selectedCustomerId));
+      if (!exists) {
+        setSelectedCustomerId(String(filteredCustomers[0].id));
+      }
+    } else {
+      setSelectedCustomerId('');
+    }
+  }, [filteredCustomers, selectedCustomerId]);
+
+  const methods = [
+    { id: 'Gọi điện', name: 'Gọi điện' },
+    { id: 'SMS', name: 'SMS' },
+    { id: 'Zalo', name: 'Zalo' },
+    { id: 'Gặp trực tiếp', name: 'Gặp trực tiếp' },
+  ];
+
+  const handleShortcutDate = (days) => {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    setPromisedDate(`${yyyy}-${mm}-${dd}`);
+  };
+
+  const handleSubmit = async () => {
+    if (!selectedCustomerId) {
+      Alert.alert('Thông báo', 'Vui lòng chọn khách hàng có dư nợ để ghi nhận.');
+      return;
+    }
+    setSubmitting(true);
+    const success = await onRecordContact(selectedCustomerId, method, content, promisedDate);
+    setSubmitting(false);
+    if (success) {
+      setContent('');
+      setPromisedDate('');
+    }
+  };
+
+  const selectedCustomer = customers.find(c => String(c.id) === String(selectedCustomerId));
+
   return (
     <>
-      <SectionTitle title="Báo cáo" subtitle="Dữ liệu lấy trực tiếp từ SQLite qua backend API" />
-      <ReportBlock
-        title="Tổng hợp kinh doanh"
-        rows={[
-          { label: 'Doanh thu đã thu', value: money.format(summary?.revenue || 0) },
-          { label: 'Công nợ khách hàng', value: money.format(summary?.debt || 0), warning: (summary?.debt || 0) > 0 },
-          { label: 'Giá trị tồn kho', value: money.format(summary?.inventoryValue || 0) },
-          { label: 'Lợi nhuận ước tính', value: money.format(summary?.profit || 0) },
-        ]}
-      />
-      <ReportBlock
-        title="Tồn kho"
-        rows={products.map((product) => ({
-          label: product.name,
-          value: `${product.stock} ${product.unit}`,
-          warning: product.stock <= product.minStock,
-        }))}
-        empty="Chưa có mặt hàng để báo cáo."
-      />
-      <ReportBlock
-        title="Công nợ theo khách"
-        rows={customers.map((customer) => ({
-          label: customer.name,
-          value: money.format(customer.debt),
-          warning: customer.debt > 0,
-        }))}
-        empty="Chưa có khách hàng để báo cáo."
-      />
-      <ReportBlock
-        title="Đơn bán gần đây"
-        rows={orders.slice(0, 8).map((order) => ({
-          label: `${order.code} · ${order.customerName}`,
-          value: money.format(order.total),
-          warning: order.status !== 'Hoàn thành',
-        }))}
-        empty="Chưa có đơn bán để báo cáo."
-      />
+      <SectionTitle title="Thu nợ công nợ" subtitle="Theo dõi tiến độ, gọi nhắc nợ và lưu nhật ký liên hệ đòi nợ" />
+      
+      {/* Overview Block */}
+      <View style={styles.debtOverview}>
+        <View style={styles.debtOverviewIcon}>
+          <MaterialCommunityIcons name="wallet-outline" size={26} color="#2e4e3f" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.debtOverviewLabel}>Tổng công nợ chưa thu</Text>
+          <Text style={styles.debtOverviewValue}>{money.format(summary?.debt || 0)}</Text>
+        </View>
+      </View>
+
+      {/* Form Section */}
+      <View style={styles.debtsFormPanel}>
+        <Text style={styles.debtsFormTitle}>Ghi nhận lịch sử đòi nợ</Text>
+        <Text style={styles.debtsFormSubtitle}>Lưu lại cuộc trao đổi, cam kết thanh toán của khách hàng</Text>
+        
+        {/* Customer Search & Picker */}
+        <Text style={styles.inputLabel}>Khách hàng cần thu nợ *</Text>
+        <SearchBox 
+          value={search} 
+          onChangeText={setSearch} 
+          placeholder="Tìm tên khách nợ..." 
+          style={{ marginBottom: 8 }}
+        />
+        
+        {filteredCustomers.length > 0 ? (
+          <PillPicker
+            items={filteredCustomers}
+            selectedId={selectedCustomerId}
+            onSelect={setSelectedCustomerId}
+            getLabel={(item) => `${item.name} (Nợ: ${money.format(item.debt)})`}
+          />
+        ) : (
+          <Text style={styles.noDebtText}>
+            {search ? 'Không tìm thấy khách nợ khớp từ khóa' : 'Không có khách nợ nào'}
+          </Text>
+        )}
+
+        {/* Contact Method Picker */}
+        <Text style={[styles.inputLabel, { marginTop: 14 }]}>Hình thức liên hệ</Text>
+        <PillPicker
+          items={methods}
+          selectedId={method}
+          onSelect={setMethod}
+          getLabel={(item) => item.name}
+        />
+
+        {/* Shortcuts for call/sms directly for the chosen customer */}
+        {selectedCustomer && selectedCustomer.phone ? (
+          <View style={styles.quickContactRow}>
+            <TouchableOpacity 
+              style={styles.quickContactBtn} 
+              onPress={() => onCall(selectedCustomer)}
+            >
+              <MaterialCommunityIcons name="phone-outline" size={16} color="#2e4e3f" />
+              <Text style={styles.quickContactBtnText}>Gọi nhắc nợ</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.quickContactBtn} 
+              onPress={() => onSms(selectedCustomer)}
+            >
+              <MaterialCommunityIcons name="message-text-outline" size={16} color="#2e4e3f" />
+              <Text style={styles.quickContactBtnText}>SMS nhắc nợ</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
+        {/* Promised payment date */}
+        <View style={{ marginTop: 14 }}>
+          <Input
+            label="Ngày hẹn trả tiền"
+            placeholder="YYYY-MM-DD (VD: 2026-05-30)"
+            value={promisedDate}
+            onChangeText={setPromisedDate}
+          />
+          <View style={styles.dateShortcuts}>
+            <TouchableOpacity style={styles.dateShortcutBtn} onPress={() => handleShortcutDate(0)}>
+              <Text style={styles.dateShortcutText}>Hôm nay</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.dateShortcutBtn} onPress={() => handleShortcutDate(1)}>
+              <Text style={styles.dateShortcutText}>Ngày mai</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.dateShortcutBtn} onPress={() => handleShortcutDate(7)}>
+              <Text style={styles.dateShortcutText}>Tuần sau</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Promised Details Content */}
+        <Input
+          label="Chi tiết cuộc gọi / cam kết"
+          placeholder="Khách hứa ngày nào chuyển khoản, lý do chậm trễ..."
+          multiline
+          numberOfLines={3}
+          value={content}
+          onChangeText={setContent}
+          style={{ marginTop: 14 }}
+        />
+
+        <TouchableOpacity 
+          style={[styles.primaryButton, { marginTop: 18 }, submitting && styles.buttonDisabled]} 
+          onPress={handleSubmit}
+          disabled={submitting}
+        >
+          <MaterialCommunityIcons name="check" size={20} color="#24372b" />
+          <Text style={styles.primaryButtonText}>
+            {submitting ? 'Đang lưu nhật ký...' : 'Lưu nhật ký liên hệ'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* History Log Section */}
+      <View style={styles.historyPanel}>
+        <Text style={styles.debtsFormTitle}>Lịch sử liên hệ đòi nợ gần đây</Text>
+        <Text style={styles.debtsFormSubtitle}>Nhật ký theo dõi các cam kết thanh toán công nợ</Text>
+
+        {contacts.length > 0 ? (
+          contacts.map((item, idx) => (
+            <View key={item.id || idx} style={styles.historyCard}>
+              <View style={styles.historyHeader}>
+                <Text style={styles.historyName}>{item.customerName}</Text>
+                <View style={styles.historyBadge}>
+                  <Text style={styles.historyBadgeText}>{item.method}</Text>
+                </View>
+              </View>
+
+              <Text style={styles.historyContent}>{item.content || 'Không có ghi chú'}</Text>
+              
+              <View style={styles.historyFooter}>
+                {item.promisedDate ? (
+                  <View style={styles.promisedBadge}>
+                    <MaterialCommunityIcons name="calendar" size={13} color="#bf6f13" />
+                    <Text style={styles.promisedText}>Hẹn trả: {item.promisedDate}</Text>
+                  </View>
+                ) : <View />}
+                
+                <Text style={styles.historyDate}>
+                  {item.createdAt ? new Date(item.createdAt.replace(' ', 'T')).toLocaleDateString('vi-VN') : ''}
+                </Text>
+              </View>
+            </View>
+          ))
+        ) : (
+          <EmptyState 
+            icon="card-text-outline" 
+            title="Chưa có lịch sử liên hệ" 
+            text="Hãy ghi nhận nhật ký liên hệ đòi nợ ở form phía trên." 
+          />
+        )}
+      </View>
     </>
   );
 }
@@ -640,10 +864,33 @@ function SectionTitle({ title, subtitle, compact }) {
 }
 
 function SearchBox(props) {
+  const [isFocused, setIsFocused] = useState(false);
+
   return (
-    <View style={styles.searchWrap}>
+    <View style={[styles.searchWrap, isFocused && styles.searchWrapFocused]}>
       <MaterialCommunityIcons name="magnify" size={20} color="#66717d" />
-      <TextInput {...props} style={styles.searchInput} placeholderTextColor="#7f8a98" />
+      <TextInput
+        {...props}
+        style={styles.searchInput}
+        placeholderTextColor="#7f8a98"
+        onFocus={(e) => {
+          setIsFocused(true);
+          if (props.onFocus) props.onFocus(e);
+        }}
+        onBlur={(e) => {
+          setIsFocused(false);
+          if (props.onBlur) props.onBlur(e);
+        }}
+      />
+      {isFocused && (
+        <TouchableOpacity 
+          style={styles.searchTick} 
+          onPress={() => Keyboard.dismiss()}
+          activeOpacity={0.7}
+        >
+          <MaterialCommunityIcons name="check-bold" size={20} color="#2e4e3f" />
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -830,25 +1077,7 @@ function ConnectionBanner({ error, apiUrl, onPress }) {
   );
 }
 
-function ReportBlock({ title, rows, empty }) {
-  return (
-    <View style={styles.reportBlock}>
-      <Text style={styles.reportTitle}>{title}</Text>
-      {rows.length ? (
-        rows.map((row, index) => (
-          <View key={`${row.label}-${index}`} style={styles.reportRow}>
-            <Text style={styles.reportLabel}>{row.label}</Text>
-            <Text style={[styles.reportValue, row.warning && styles.reportValueWarning]}>{row.value}</Text>
-          </View>
-        ))
-      ) : (
-        <Text style={styles.reportEmpty}>{empty}</Text>
-      )}
-    </View>
-  );
-}
-
-function ProductModal({ visible, product, onClose, onSave }) {
+function ProductModal({ visible, product, onClose, onSave, showAlert }) {
   const [form, setForm] = useState(emptyProduct);
   const [saving, setSaving] = useState(false);
 
@@ -875,7 +1104,7 @@ function ProductModal({ visible, product, onClose, onSave }) {
     try {
       await onSave(form, product?.id);
     } catch (error) {
-      Alert.alert('Không lưu được mặt hàng', error.message);
+      showAlert('Không lưu được mặt hàng', error.message);
     } finally {
       setSaving(false);
     }
@@ -907,7 +1136,7 @@ function ProductModal({ visible, product, onClose, onSave }) {
   );
 }
 
-function CustomerModal({ visible, customer, onClose, onSave }) {
+function CustomerModal({ visible, customer, onClose, onSave, showAlert }) {
   const [form, setForm] = useState(emptyCustomer);
   const [saving, setSaving] = useState(false);
 
@@ -931,7 +1160,7 @@ function CustomerModal({ visible, customer, onClose, onSave }) {
     try {
       await onSave(form, customer?.id);
     } catch (error) {
-      Alert.alert('Không lưu được khách hàng', error.message);
+      showAlert('Không lưu được khách hàng', error.message);
     } finally {
       setSaving(false);
     }
@@ -958,7 +1187,7 @@ function CustomerModal({ visible, customer, onClose, onSave }) {
   );
 }
 
-function OrderModal({ visible, products, customers, onClose, onSave }) {
+function OrderModal({ visible, products, customers, onClose, onSave, showAlert }) {
   const [form, setForm] = useState(emptyOrder);
   const [saving, setSaving] = useState(false);
   const product = products.find((item) => String(item.id) === String(form.productId));
@@ -977,7 +1206,7 @@ function OrderModal({ visible, products, customers, onClose, onSave }) {
     try {
       await onSave(form);
     } catch (error) {
-      Alert.alert('Không tạo được đơn', error.message);
+      showAlert('Không tạo được đơn', error.message);
     } finally {
       setSaving(false);
     }
@@ -1009,7 +1238,7 @@ function OrderModal({ visible, products, customers, onClose, onSave }) {
   );
 }
 
-function PaymentModal({ visible, customer, onClose, onSave }) {
+function PaymentModal({ visible, customer, onClose, onSave, showAlert }) {
   const [amount, setAmount] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -1023,7 +1252,7 @@ function PaymentModal({ visible, customer, onClose, onSave }) {
     try {
       await onSave(customer, amount);
     } catch (error) {
-      Alert.alert('Không thu được công nợ', error.message);
+      showAlert('Không thu được công nợ', error.message);
     } finally {
       setSaving(false);
     }
@@ -1059,39 +1288,139 @@ function ApiModal({ visible, apiUrl, onChange, onClose, onSave }) {
   );
 }
 
-function FormModal({ visible, title, subtitle, children, onClose, onSubmit, submitLabel }) {
+function AlertModal({ config, onClose }) {
+  if (!config.visible) return null;
+
   return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <View style={styles.modalBackdrop}>
-        <View style={styles.modalPanel}>
-          <View style={styles.modalHeader}>
-            <View style={styles.cardMain}>
-              <Text style={styles.modalTitle}>{title}</Text>
-              <Text style={styles.modalSubtitle}>{subtitle}</Text>
-            </View>
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <MaterialCommunityIcons name="close" size={20} color="#24372b" />
-            </TouchableOpacity>
+    <Modal visible={config.visible} animationType="fade" transparent statusBarTranslucent>
+      <View style={styles.alertBackdrop}>
+        <View style={styles.alertPanel}>
+          <View style={styles.alertIconBg}>
+            <MaterialCommunityIcons
+              name={config.title.includes('Xóa') ? 'alert-circle-outline' : 'information-outline'}
+              size={32}
+              color={config.title.includes('Xóa') ? '#bf3f2f' : '#24372b'}
+            />
           </View>
-          <ScrollView showsVerticalScrollIndicator={false}>{children}</ScrollView>
-          <TouchableOpacity style={styles.createButton} onPress={onSubmit}>
-            <Text style={styles.createButtonText}>{submitLabel}</Text>
-          </TouchableOpacity>
+          <Text style={styles.alertTitle}>{config.title}</Text>
+          <Text style={styles.alertMessage}>{config.message}</Text>
+          <View style={styles.alertButtonRow}>
+            {config.buttons && config.buttons.length > 0 ? (
+              config.buttons.map((btn, index) => {
+                const isDestructive = btn.style === 'destructive';
+                const isCancel = btn.style === 'cancel';
+                return (
+                  <TouchableOpacity
+                    key={index}
+                    style={[
+                      styles.alertButton,
+                      isDestructive && styles.alertButtonDestructive,
+                      isCancel && styles.alertButtonCancel,
+                    ]}
+                    onPress={() => {
+                      onClose();
+                      if (btn.onPress) btn.onPress();
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.alertButtonText,
+                        isDestructive && styles.alertButtonTextDestructive,
+                        isCancel && styles.alertButtonTextCancel,
+                      ]}
+                    >
+                      {btn.text}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })
+            ) : (
+              <TouchableOpacity
+                style={styles.alertButton}
+                onPress={onClose}
+              >
+                <Text style={styles.alertButtonText}>Đóng</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </View>
     </Modal>
   );
 }
 
+function FormModal({ visible, title, subtitle, children, onClose, onSubmit, submitLabel }) {
+  return (
+    <Modal visible={visible} animationType="slide" transparent statusBarTranslucent>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalPanel}>
+              <View style={styles.modalHeader}>
+                <View style={styles.cardMain}>
+                  <Text style={styles.modalTitle}>{title}</Text>
+                  <Text style={styles.modalSubtitle}>{subtitle}</Text>
+                </View>
+                <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+                  <MaterialCommunityIcons name="close" size={20} color="#24372b" />
+                </TouchableOpacity>
+              </View>
+              
+              <ScrollView 
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
+                <TouchableWithoutFeedback>
+                  <View style={{ paddingBottom: 20 }}>
+                    {children}
+                  </View>
+                </TouchableWithoutFeedback>
+              </ScrollView>
+              
+              <TouchableOpacity style={styles.createButton} onPress={onSubmit}>
+                <Text style={styles.createButtonText}>{submitLabel}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
 function Input({ label, style, ...props }) {
+  const [isFocused, setIsFocused] = useState(false);
+
   return (
     <View style={[styles.inputWrap, style]}>
       <Text style={styles.inputLabel}>{label}</Text>
-      <TextInput
-        {...props}
-        style={[styles.input, props.multiline && styles.inputMultiline]}
-        placeholderTextColor="#7f8a98"
-      />
+      <View style={[styles.inputContainer, isFocused && styles.inputContainerFocused]}>
+        <TextInput
+          {...props}
+          style={[styles.input, props.multiline && styles.inputMultiline]}
+          placeholderTextColor="#7f8a98"
+          onFocus={(e) => {
+            setIsFocused(true);
+            if (props.onFocus) props.onFocus(e);
+          }}
+          onBlur={(e) => {
+            setIsFocused(false);
+            if (props.onBlur) props.onBlur(e);
+          }}
+        />
+        {isFocused && (
+          <TouchableOpacity 
+            style={styles.inputTick} 
+            onPress={() => Keyboard.dismiss()}
+            activeOpacity={0.7}
+          >
+            <MaterialCommunityIcons name="check-bold" size={20} color="#2e4e3f" />
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 }
@@ -1686,16 +2015,117 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginTop: 10,
   },
-  input: {
-    minHeight: 48,
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#d8ded4',
+    backgroundColor: '#ffffff',
+  },
+  inputContainerFocused: {
+    borderColor: '#2e4e3f',
+    borderWidth: 1.5,
+  },
+  input: {
+    flex: 1,
+    minHeight: 48,
     paddingHorizontal: 12,
     color: '#17231c',
     fontSize: 15,
     fontWeight: '700',
+  },
+  inputTick: {
+    paddingHorizontal: 12,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  searchWrapFocused: {
+    borderColor: '#2e4e3f',
+    borderWidth: 1.5,
+  },
+  searchTick: {
+    paddingHorizontal: 12,
+    height: 46,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  alertBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(13, 22, 17, 0.62)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  alertPanel: {
     backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 20,
+    width: '100%',
+    maxWidth: 320,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e7dd',
+    shadowColor: '#17231c',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  alertIconBg: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#f1f5ef',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  alertTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#17231c',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  alertMessage: {
+    fontSize: 14,
+    color: '#556057',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  alertButtonRow: {
+    flexDirection: 'row',
+    gap: 10,
+    width: '100%',
+    justifyContent: 'center',
+  },
+  alertButton: {
+    flex: 1,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: '#e6ede2',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  alertButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#2e4e3f',
+  },
+  alertButtonDestructive: {
+    backgroundColor: '#fdebeb',
+  },
+  alertButtonTextDestructive: {
+    color: '#bf3f2f',
+  },
+  alertButtonCancel: {
+    backgroundColor: '#f1f3f0',
+  },
+  alertButtonTextCancel: {
+    color: '#66717d',
   },
   inputMultiline: {
     minHeight: 82,
@@ -1758,5 +2188,165 @@ const styles = StyleSheet.create({
     color: '#24372b',
     fontWeight: '900',
     fontSize: 16,
+  },
+  debtOverview: {
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e7dd',
+    padding: 14,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  debtOverviewIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 8,
+    backgroundColor: '#eef3eb',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  debtOverviewLabel: {
+    color: '#66717d',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  debtOverviewValue: {
+    color: '#bf3f2f',
+    fontSize: 21,
+    fontWeight: '900',
+    marginTop: 2,
+  },
+  debtsFormPanel: {
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e7dd',
+    padding: 14,
+    marginBottom: 12,
+  },
+  debtsFormTitle: {
+    color: '#17231c',
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  debtsFormSubtitle: {
+    color: '#66717d',
+    fontSize: 12,
+    marginTop: 2,
+    marginBottom: 12,
+  },
+  noDebtText: {
+    color: '#66717d',
+    fontStyle: 'italic',
+    paddingVertical: 10,
+    fontSize: 13,
+  },
+  quickContactRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  quickContactBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#eef3eb',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#d0dacb',
+  },
+  quickContactBtnText: {
+    color: '#2e4e3f',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  dateShortcuts: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 6,
+  },
+  dateShortcutBtn: {
+    backgroundColor: '#eef3eb',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#d0dacb',
+  },
+  dateShortcutText: {
+    color: '#2e4e3f',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  historyPanel: {
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e7dd',
+    padding: 14,
+  },
+  historyCard: {
+    borderTopWidth: 1,
+    borderTopColor: '#eef1eb',
+    paddingVertical: 12,
+  },
+  historyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  historyName: {
+    color: '#17231c',
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  historyBadge: {
+    backgroundColor: '#e5ecf6',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  historyBadgeText: {
+    color: '#3b629b',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  historyContent: {
+    color: '#49554e',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  historyFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  promisedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#fff3e0',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  promisedText: {
+    color: '#bf6f13',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  historyDate: {
+    color: '#7f8a98',
+    fontSize: 11,
+    fontWeight: '700',
   },
 });
