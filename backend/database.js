@@ -133,6 +133,7 @@ async function initDatabase() {
       product_id INTEGER NOT NULL,
       quantity REAL NOT NULL,
       unit_price INTEGER NOT NULL,
+      unit_cost INTEGER NOT NULL DEFAULT 0,
       total INTEGER NOT NULL,
       paid INTEGER NOT NULL DEFAULT 0,
       status TEXT NOT NULL DEFAULT 'Đang giao',
@@ -142,6 +143,12 @@ async function initDatabase() {
       FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT
     )
   `);
+
+  try {
+    await run('ALTER TABLE orders ADD COLUMN unit_cost INTEGER NOT NULL DEFAULT 0');
+  } catch (err) {
+    // Column already exists, ignore
+  }
 
   await run(`
     CREATE TABLE IF NOT EXISTS debt_contacts (

@@ -99,6 +99,7 @@ function mapOrder(row) {
     productName: row.product_name,
     quantity: row.quantity,
     unitPrice: row.unit_price,
+    unitCost: row.unit_cost || 0,
     total: row.total,
     paid: row.paid,
     status: row.status,
@@ -143,7 +144,7 @@ app.get('/api/summary', async (_req, res, next) => {
         get('SELECT COALESCE(SUM(debt), 0) AS value FROM customers'),
         get('SELECT COALESCE(SUM(stock * cost), 0) AS value FROM products'),
         get(`
-          SELECT COALESCE(SUM((orders.unit_price - products.cost) * orders.quantity), 0) AS value
+          SELECT COALESCE(SUM((orders.unit_price - COALESCE(NULLIF(orders.unit_cost, 0), products.cost)) * orders.quantity), 0) AS value
           FROM orders
           JOIN products ON products.id = orders.product_id
           WHERE orders.status != 'Đã hủy'
@@ -383,20 +384,52 @@ app.post('/api/customers/:id/payments', async (req, res, next) => {
       return;
     }
 
-    await run(
-      `UPDATE customers
-       SET debt = CASE WHEN debt - ? < 0 THEN 0 ELSE debt - ? END,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`,
-      [amount, amount, req.params.id],
-    );
-
-    const row = await get('SELECT * FROM customers WHERE id = ?', [req.params.id]);
-    if (!row) {
+    const customer = await get('SELECT * FROM customers WHERE id = ?', [req.params.id]);
+    if (!customer) {
       res.status(404).json({ message: 'Không tìm thấy khách hàng.' });
       return;
     }
-    res.json(mapCustomer(row));
+
+    await transaction(async () => {
+      // 1. Giảm trừ tổng công nợ của khách hàng
+      await run(
+        `UPDATE customers
+         SET debt = CASE WHEN debt - ? < 0 THEN 0 ELSE debt - ? END,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [amount, amount, req.params.id],
+      );
+
+      // 2. Lấy danh sách các đơn hàng chưa hoàn thành, chưa hủy của khách hàng này (ưu tiên đơn cũ trước - FIFO)
+      const unpaidOrders = await all(
+        `SELECT * FROM orders
+         WHERE customer_id = ? AND status != 'Hoàn thành' AND status != 'Đã hủy'
+         ORDER BY created_at ASC, id ASC`,
+        [req.params.id],
+      );
+
+      let remainingPayment = amount;
+      for (const order of unpaidOrders) {
+        if (remainingPayment <= 0) break;
+
+        const unpaidOfOrder = Math.max(order.total - order.paid, 0);
+        if (unpaidOfOrder <= 0) continue;
+
+        const paymentToApply = Math.min(remainingPayment, unpaidOfOrder);
+        const newPaid = order.paid + paymentToApply;
+        const newStatus = newPaid >= order.total ? 'Hoàn thành' : order.status;
+
+        await run(
+          'UPDATE orders SET paid = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+          [newPaid, newStatus, order.id],
+        );
+
+        remainingPayment -= paymentToApply;
+      }
+    });
+
+    const updatedCustomer = await get('SELECT * FROM customers WHERE id = ?', [req.params.id]);
+    res.json(mapCustomer(updatedCustomer));
   } catch (error) {
     next(error);
   }
@@ -514,9 +547,9 @@ app.post('/api/orders', async (req, res, next) => {
     await transaction(async () => {
       const result = await run(
         `INSERT INTO orders
-         (code, customer_id, product_id, quantity, unit_price, total, paid, status, note)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [code, customerId, productId, quantity, product.price, total, realPaid, status, note],
+         (code, customer_id, product_id, quantity, unit_price, unit_cost, total, paid, status, note)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [code, customerId, productId, quantity, product.price, product.cost, total, realPaid, status, note],
       );
 
       await run(
