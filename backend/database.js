@@ -1,14 +1,13 @@
 const fs = require('fs');
 const path = require('path');
 const { Pool } = require('pg');
-const sqlite3 = require('sqlite3').verbose();
-
 const usePostgres = Boolean(process.env.DATABASE_URL);
 const dataDir = path.join(__dirname, 'data');
 const dbPath = path.join(dataDir, 'ricehub.sqlite');
 
 let sqliteDb;
 let pgPool;
+let sqlite3;
 
 if (usePostgres) {
   pgPool = new Pool({
@@ -16,6 +15,7 @@ if (usePostgres) {
     ssl: process.env.PGSSLMODE === 'disable' ? false : { rejectUnauthorized: false },
   });
 } else {
+  sqlite3 = require('sqlite3').verbose();
   fs.mkdirSync(dataDir, { recursive: true });
   sqliteDb = new sqlite3.Database(dbPath);
 }
