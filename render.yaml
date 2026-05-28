@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: ricehub-manager
+    env: docker
+    plan: starter
+    autoDeploy: true
+    disk:
+      name: ricehub-data
+      mountPath: /app/backend/data
+      sizeGB: 1
+    healthCheckPath: /health

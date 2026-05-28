@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "rice-manager-app",
-    "slug": "rice-manager-app",
+    "name": "RiceHub Manager",
+    "slug": "ricehub-manager",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -11,7 +11,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#24372B",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"

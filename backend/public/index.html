@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RiceHub Manager</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-icon">🌾</div>
+        <div>
+          <strong>RiceHub</strong>
+          <span>Quản lí bán gạo</span>
+        </div>
+      </div>
+      <nav>
+        <button class="nav active" data-view="dashboard">Tổng quan</button>
+        <button class="nav" data-view="products">Mặt hàng</button>
+        <button class="nav" data-view="customers">Khách hàng</button>
+        <button class="nav" data-view="orders">Đơn bán</button>
+        <button class="nav" data-view="debts">Thu nợ</button>
+      </nav>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h1 id="page-title">Tổng quan</h1>
+          <p>Dữ liệu được lưu trong SQLite qua backend Express.</p>
+        </div>
+        <button id="refresh" class="primary">Làm mới</button>
+      </header>
+
+      <section id="dashboard" class="view active">
+        <div class="metrics">
+          <article><span>Doanh thu</span><strong id="m-revenue">0 đ</strong></article>
+          <article><span>Công nợ</span><strong id="m-debt">0 đ</strong></article>
+          <article><span>Tồn kho</span><strong id="m-stock">0 đ</strong></article>
+          <article><span>Lợi nhuận</span><strong id="m-profit">0 đ</strong></article>
+        </div>
+        <div class="grid two">
+          <section class="panel">
+            <h2>Khách đang nợ</h2>
+            <div id="debt-customers" class="list"></div>
+          </section>
+          <section class="panel">
+            <h2>Hàng sắp hết</h2>
+            <div id="low-stock" class="list"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="products" class="view">
+        <div class="panel">
+          <h2>Thêm mặt hàng</h2>
+          <form id="product-form" class="form-grid">
+            <input name="name" placeholder="Tên mặt hàng" required />
+            <input name="type" placeholder="Loại gạo" />
+            <input name="origin" placeholder="Xuất xứ" />
+            <input name="unit" placeholder="Đơn vị" value="kg" />
+            <input name="price" type="number" placeholder="Giá bán" />
+            <input name="cost" type="number" placeholder="Giá vốn" />
+            <input name="stock" type="number" placeholder="Tồn kho" />
+            <input name="minStock" type="number" placeholder="Cảnh báo tồn" />
+            <input name="note" placeholder="Ghi chú" />
+            <button class="primary">Lưu mặt hàng</button>
+          </form>
+        </div>
+        <div id="products-list" class="cards"></div>
+      </section>
+
+      <section id="customers" class="view">
+        <div class="panel">
+          <h2>Thêm khách hàng</h2>
+          <form id="customer-form" class="form-grid">
+            <input name="name" placeholder="Tên khách hàng" required />
+            <input name="phone" placeholder="Số điện thoại" />
+            <input name="address" placeholder="Địa chỉ" />
+            <input name="group" placeholder="Nhóm khách" value="Khách lẻ" />
+            <input name="debt" type="number" placeholder="Công nợ đầu kỳ" />
+            <input name="note" placeholder="Ghi chú" />
+            <button class="primary">Lưu khách hàng</button>
+          </form>
+        </div>
+        <div id="customers-list" class="cards"></div>
+      </section>
+
+      <section id="orders" class="view">
+        <div class="panel">
+          <h2>Tạo đơn bán</h2>
+          <form id="order-form" class="form-grid">
+            <select name="customerId" required></select>
+            <select name="productId" required></select>
+            <input name="quantity" type="number" placeholder="Số lượng" required />
+            <input name="paid" type="number" placeholder="Đã thu" />
+            <input name="note" placeholder="Ghi chú" />
+            <button class="primary">Lưu đơn</button>
+          </form>
+        </div>
+        <div id="orders-list" class="cards"></div>
+      </section>
+
+      <section id="debts" class="view">
+        <div class="grid two">
+          <section class="panel">
+            <h2>Liên hệ thu nợ</h2>
+            <form id="contact-form" class="stack">
+              <select name="customerId" required></select>
+              <select name="method">
+                <option>Gọi điện</option>
+                <option>SMS</option>
+                <option>Zalo</option>
+                <option>Gặp trực tiếp</option>
+              </select>
+              <input name="promisedDate" type="date" />
+              <textarea name="content" placeholder="Nội dung trao đổi"></textarea>
+              <button class="primary">Ghi lịch sử liên hệ</button>
+            </form>
+          </section>
+          <section class="panel">
+            <h2>Lịch sử liên hệ</h2>
+            <div id="contacts-list" class="list"></div>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
