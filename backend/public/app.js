@@ -79,16 +79,30 @@ function renderDashboard() {
   qs('#m-debt').textContent = money.format(state.summary?.debt || 0);
   qs('#m-stock').textContent = money.format(state.summary?.inventoryValue || 0);
   qs('#m-profit').textContent = money.format(state.summary?.profit || 0);
-  qs('#debt-customers').innerHTML = listHtml(
-    state.summary?.debtCustomers || [],
-    (item) => `${html(item.name)}<span>${html(item.phone)} · ${money.format(item.debt)}</span>`,
-    'Chưa có khách nợ.',
-  );
-  qs('#low-stock').innerHTML = listHtml(
-    state.summary?.lowStock || [],
-    (item) => `${html(item.name)}<span>Còn ${item.stock} ${html(item.unit)}</span>`,
-    'Không có hàng sắp hết.',
-  );
+  
+  qs('#debt-customers').innerHTML = state.summary?.debtCustomers?.length
+    ? state.summary.debtCustomers.map((item) => `
+      <div class="list-item">
+        <div class="list-item-content">
+          <span class="list-item-title">${html(item.name)}</span>
+          <span class="list-item-details">${html(item.phone || 'Chưa có SĐT')}</span>
+        </div>
+        <span class="list-item-value debt-amount">${money.format(item.debt)}</span>
+      </div>
+    `).join('')
+    : '<p class="muted-text">Chưa có khách nợ công nợ.</p>';
+  
+  qs('#low-stock').innerHTML = state.summary?.lowStock?.length
+    ? state.summary.lowStock.map((item) => `
+      <div class="list-item">
+        <div class="list-item-content">
+          <span class="list-item-title">${html(item.name)}</span>
+          <span class="list-item-details">Hạn mức cảnh báo: ${item.minStock} ${html(item.unit)}</span>
+        </div>
+        <span class="list-item-value stock-amount">${item.stock} ${html(item.unit)}</span>
+      </div>
+    `).join('')
+    : '<p class="muted-text">Kho hàng đầy đủ, không có hàng sắp hết.</p>';
 }
 
 function renderProducts() {
@@ -96,21 +110,31 @@ function renderProducts() {
     ? state.products.map((item) => `
       <article class="card">
         <div class="card-head">
-          <div>
+          <div class="card-title-block">
             <h3>${html(item.name)}</h3>
-            <p>${html(item.type || 'Chưa phân loại')} · ${html(item.origin || 'Chưa có xuất xứ')}</p>
+            <p class="card-subtitle-block">${html(item.type || 'Chưa phân loại')} · ${html(item.origin || 'Chưa có xuất xứ')}</p>
           </div>
-          <strong>${money.format(item.price)}</strong>
+          <strong class="card-price">${money.format(item.price)}</strong>
         </div>
-        <p>Tồn kho: ${item.stock} ${html(item.unit)} · Giá vốn: ${money.format(item.cost)}</p>
-        <p>${html(item.note || '')}</p>
+        <div class="card-body-text">
+          <strong>Đơn vị:</strong> ${html(item.unit)} &nbsp;&middot;&nbsp; 
+          <strong>Giá vốn:</strong> ${money.format(item.cost)} &nbsp;&middot;&nbsp; 
+          <strong>Tồn kho:</strong> <span class="badge ${item.stock <= item.minStock ? 'danger' : 'success'}">${item.stock} / ${item.minStock} ${html(item.unit)}</span>
+        </div>
+        ${item.note ? `<p class="card-note">${html(item.note)}</p>` : ''}
         <div class="actions">
-          <button class="ghost" onclick="editProduct(${item.id})">Sửa</button>
-          <button class="ghost danger" onclick="deleteProduct(${item.id})">Xóa</button>
+          <button class="ghost" onclick="editProduct(${item.id})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <span>Sửa</span>
+          </button>
+          <button class="ghost danger" onclick="deleteProduct(${item.id})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+            <span>Xóa</span>
+          </button>
         </div>
       </article>
     `).join('')
-    : '<p class="muted">Chưa có mặt hàng.</p>';
+    : '<p class="muted-text">Chưa có mặt hàng nào trong danh sách.</p>';
 }
 
 function renderCustomers() {
@@ -118,63 +142,154 @@ function renderCustomers() {
     ? state.customers.map((item) => `
       <article class="card">
         <div class="card-head">
-          <div>
+          <div class="card-title-block">
             <h3>${html(item.name)}</h3>
-            <p>${html(item.group)} · ${html(item.phone || 'Chưa có số điện thoại')}</p>
+            <p class="card-subtitle-block">
+              <span class="badge info">${html(item.group)}</span> 
+              ${item.phone ? `· ${html(item.phone)}` : '· Chưa có SĐT'}
+            </p>
           </div>
-          <strong>${money.format(item.debt)}</strong>
+          <strong class="card-price debt-amount">${money.format(item.debt)}</strong>
         </div>
-        <p>${html(item.address || 'Chưa có địa chỉ')}</p>
+        <div class="card-body-text">
+          <strong>Địa chỉ:</strong> ${html(item.address || 'Chưa cập nhật địa chỉ')}
+        </div>
+        ${item.note ? `<p class="card-note">${html(item.note)}</p>` : ''}
         <div class="actions">
-          <a class="ghost" href="tel:${html(item.phone)}">Gọi</a>
-          <a class="ghost" href="sms:${html(item.phone)}?body=${encodeURIComponent('Chào anh/chị, cửa hàng gạo xin nhắc công nợ hiện tại là ' + money.format(item.debt) + '. Anh/chị vui lòng thanh toán giúp em nhé.')}">SMS</a>
-          <button class="ghost" onclick="editCustomer(${item.id})">Sửa</button>
-          <button class="ghost danger" onclick="deleteCustomer(${item.id})">Xóa</button>
+          <button class="ghost" style="color: var(--primary); border-color: var(--primary-light); background: var(--primary-light);" onclick="payCustomerDebt(${item.id})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            <span>Thu nợ</span>
+          </button>
+          ${item.phone ? `
+            <a class="ghost" href="tel:${html(item.phone)}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+              <span>Gọi</span>
+            </a>
+            <a class="ghost" href="sms:${html(item.phone)}?body=${encodeURIComponent('Chào anh/chị, cửa hàng gạo xin nhắc công nợ hiện tại là ' + money.format(item.debt) + '. Anh/chị vui lòng thanh toán giúp em nhé.')}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <span>SMS</span>
+            </a>
+          ` : ''}
+          <button class="ghost" onclick="editCustomer(${item.id})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <span>Sửa</span>
+          </button>
+          <button class="ghost danger" onclick="deleteCustomer(${item.id})">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+            <span>Xóa</span>
+          </button>
         </div>
       </article>
     `).join('')
-    : '<p class="muted">Chưa có khách hàng.</p>';
+    : '<p class="muted-text">Chưa có khách hàng nào trong danh sách.</p>';
 }
 
 function renderOrders() {
   qs('#orders-list').innerHTML = state.orders.length
-    ? state.orders.map((item) => `
-      <article class="card">
-        <div class="card-head">
-          <div>
-            <h3>${html(item.code)} · ${html(item.customerName)}</h3>
-            <p>${html(item.productName)} · ${item.quantity} kg · ${html(item.status)}</p>
-          </div>
-          <strong>${money.format(item.total)}</strong>
-        </div>
-        <p>Đã thu: ${money.format(item.paid)} · Còn nợ: ${money.format(Math.max(item.total - item.paid, 0))}</p>
-      </article>
-    `).join('')
-    : '<p class="muted">Chưa có đơn bán.</p>';
+    ? state.orders.map((item) => {
+        const unpaid = Math.max(item.total - item.paid, 0);
+        const isDone = unpaid <= 0 || item.status === 'Hoàn thành';
+        return `
+          <article class="card">
+            <div class="card-head">
+              <div class="card-title-block">
+                <h3>Mã đơn: ${html(item.code)}</h3>
+                <p class="card-subtitle-block">
+                  <strong>Khách hàng:</strong> ${html(item.customerName)}
+                </p>
+              </div>
+              <strong class="card-price">${money.format(item.total)}</strong>
+            </div>
+            <div class="card-body-text">
+              <strong>Sản phẩm:</strong> ${html(item.productName)} &nbsp;&middot;&nbsp; <strong>Số lượng:</strong> ${item.quantity} kg<br/>
+              <strong>Đã thu:</strong> ${money.format(item.paid)} &nbsp;&middot;&nbsp; 
+              <strong>Còn nợ:</strong> <span class="${unpaid > 0 ? 'debt-amount font-bold' : 'text-success'}">${money.format(unpaid)}</span>
+            </div>
+            <div style="margin-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+              <span class="badge ${isDone ? 'success' : 'warning'}">${html(item.status)}</span>
+              ${!isDone ? `
+                <button class="ghost" onclick="markOrderDone(${item.id})" style="font-size: 12px; height: 30px; border-color: var(--primary);">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 12px; height: 12px; color: var(--primary);"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span style="color: var(--primary);">Thu đủ nợ</span>
+                </button>
+              ` : ''}
+            </div>
+            ${item.note ? `<p class="card-note" style="margin-top: 10px;">${html(item.note)}</p>` : ''}
+          </article>
+        `;
+      }).join('')
+    : '<p class="muted-text">Chưa có đơn hàng nào.</p>';
 }
 
 function renderDebtContacts() {
-  qs('#contacts-list').innerHTML = listHtml(
-    state.contacts,
-    (item) => `${html(item.customerName)}<span>${html(item.method)} · ${html(item.content || 'Không có ghi chú')} · Hẹn: ${html(item.promisedDate || 'chưa có')}</span>`,
-    'Chưa có lịch sử liên hệ.',
-  );
-}
-
-function listHtml(items, renderer, empty) {
-  return items.length
-    ? items.map((item) => `<div class="list-item"><strong>${renderer(item)}</strong></div>`).join('')
-    : `<p class="muted">${empty}</p>`;
+  qs('#contacts-list').innerHTML = state.contacts.length
+    ? state.contacts.map((item) => `
+      <div class="list-item">
+        <div class="list-item-content">
+          <span class="list-item-title">${html(item.customerName)}</span>
+          <span class="list-item-details">
+            <strong>Hình thức:</strong> ${html(item.method)} · 
+            <strong>Nội dung:</strong> ${html(item.content || 'Không có ghi chú')}
+          </span>
+          ${item.promisedDate ? `
+            <span class="list-item-details" style="color: var(--accent-hover); font-weight: 600; display: inline-flex; align-items: center; gap: 4px; margin-top: 4px;">
+              📅 Hẹn trả: ${html(item.promisedDate)}
+            </span>
+          ` : ''}
+        </div>
+        <span class="badge info">${html(item.status)}</span>
+      </div>
+    `).join('')
+    : '<p class="muted-text">Chưa có lịch sử liên hệ thu nợ nào.</p>';
 }
 
 function fillSelects() {
   document.querySelectorAll('select[name="customerId"]').forEach((select) => {
-    select.innerHTML = state.customers.map((item) => `<option value="${item.id}">${html(item.name)} · ${money.format(item.debt)}</option>`).join('');
+    select.innerHTML = state.customers.map((item) => `<option value="${item.id}">${html(item.name)} · Nợ: ${money.format(item.debt)}</option>`).join('');
   });
   document.querySelectorAll('select[name="productId"]').forEach((select) => {
-    select.innerHTML = state.products.map((item) => `<option value="${item.id}">${html(item.name)} · ${item.stock} ${html(item.unit)}</option>`).join('');
+    select.innerHTML = state.products.map((item) => `<option value="${item.id}">${html(item.name)} · Tồn: ${item.stock} ${html(item.unit)}</option>`).join('');
   });
 }
+
+window.payCustomerDebt = async (id) => {
+  const customer = state.customers.find((c) => c.id === id);
+  if (!customer) return;
+  const amountStr = prompt(`Nhập số tiền ${html(customer.name)} thanh toán (Đang nợ: ${money.format(customer.debt)}):`);
+  if (amountStr === null) return;
+  const amount = parseInt(amountStr.replace(/[^0-9]/g, ''), 10);
+  if (isNaN(amount) || amount <= 0) {
+    alert('Số tiền nhập không hợp lệ!');
+    return;
+  }
+  try {
+    await api.send(`/api/customers/${id}/payments`, 'POST', { amount });
+    await loadAll();
+  } catch (error) {
+    alert(error.message);
+  }
+};
+
+window.markOrderDone = async (id) => {
+  if (!confirm('Xác nhận thu đủ nợ và hoàn thành đơn hàng này?')) return;
+  try {
+    const order = state.orders.find((o) => o.id === id);
+    if (!order) return;
+    const unpaid = Math.max(order.total - order.paid, 0);
+    
+    // 1. Cập nhật trạng thái đơn hàng thành 'Hoàn thành'
+    await api.send(`/api/orders/${id}/status`, 'PUT', { status: 'Hoàn thành' });
+    
+    // 2. Đồng thời giảm trừ nợ của khách hàng đó
+    if (unpaid > 0) {
+      await api.send(`/api/customers/${order.customerId}/payments`, 'POST', { amount: unpaid });
+    }
+    
+    await loadAll();
+  } catch (error) {
+    alert(error.message);
+  }
+};
 
 window.editProduct = (id) => {
   const item = state.products.find((product) => product.id === id);
@@ -183,6 +298,9 @@ window.editProduct = (id) => {
     if (form.elements[key]) form.elements[key].value = value;
   });
   form.dataset.id = id;
+  // Scroll to form and focus
+  form.scrollIntoView({ behavior: 'smooth' });
+  form.elements.name.focus();
 };
 
 window.editCustomer = (id) => {
@@ -192,18 +310,29 @@ window.editCustomer = (id) => {
     if (form.elements[key]) form.elements[key].value = value;
   });
   form.dataset.id = id;
+  // Scroll to form and focus
+  form.scrollIntoView({ behavior: 'smooth' });
+  form.elements.name.focus();
 };
 
 window.deleteProduct = async (id) => {
-  if (!confirm('Xóa mặt hàng này?')) return;
-  await api.delete(`/api/products/${id}`);
-  await loadAll();
+  if (!confirm('Bạn có chắc chắn muốn xóa mặt hàng này?')) return;
+  try {
+    await api.delete(`/api/products/${id}`);
+    await loadAll();
+  } catch (error) {
+    alert(error.message);
+  }
 };
 
 window.deleteCustomer = async (id) => {
-  if (!confirm('Xóa khách hàng này?')) return;
-  await api.delete(`/api/customers/${id}`);
-  await loadAll();
+  if (!confirm('Bạn có chắc chắn muốn xóa khách hàng này?')) return;
+  try {
+    await api.delete(`/api/customers/${id}`);
+    await loadAll();
+  } catch (error) {
+    alert(error.message);
+  }
 };
 
 document.querySelectorAll('.nav').forEach((button) => {
@@ -211,22 +340,40 @@ document.querySelectorAll('.nav').forEach((button) => {
     document.querySelectorAll('.nav, .view').forEach((item) => item.classList.remove('active'));
     button.classList.add('active');
     qs(`#${button.dataset.view}`).classList.add('active');
-    qs('#page-title').textContent = button.textContent;
+    qs('#page-title').textContent = button.querySelector('span').textContent;
   });
 });
 
-qs('#refresh').addEventListener('click', loadAll);
+qs('#refresh').addEventListener('click', async () => {
+  const btn = qs('#refresh');
+  btn.style.pointerEvents = 'none';
+  btn.style.opacity = '0.7';
+  btn.querySelector('span').textContent = 'Đang làm mới...';
+  try {
+    await loadAll();
+  } catch (error) {
+    alert(error.message);
+  } finally {
+    btn.style.pointerEvents = 'auto';
+    btn.style.opacity = '1';
+    btn.querySelector('span').textContent = 'Làm mới dữ liệu';
+  }
+});
 
 qs('#product-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = event.currentTarget;
   const body = formData(form);
   const id = form.dataset.id;
-  await api.send(id ? `/api/products/${id}` : '/api/products', id ? 'PUT' : 'POST', body);
-  form.reset();
-  form.elements.unit.value = 'kg';
-  delete form.dataset.id;
-  await loadAll();
+  try {
+    await api.send(id ? `/api/products/${id}` : '/api/products', id ? 'PUT' : 'POST', body);
+    form.reset();
+    form.elements.unit.value = 'kg';
+    delete form.dataset.id;
+    await loadAll();
+  } catch (error) {
+    alert(error.message);
+  }
 });
 
 qs('#customer-form').addEventListener('submit', async (event) => {
@@ -234,26 +381,38 @@ qs('#customer-form').addEventListener('submit', async (event) => {
   const form = event.currentTarget;
   const body = formData(form);
   const id = form.dataset.id;
-  await api.send(id ? `/api/customers/${id}` : '/api/customers', id ? 'PUT' : 'POST', body);
-  form.reset();
-  form.elements.group.value = 'Khách lẻ';
-  delete form.dataset.id;
-  await loadAll();
+  try {
+    await api.send(id ? `/api/customers/${id}` : '/api/customers', id ? 'PUT' : 'POST', body);
+    form.reset();
+    form.elements.group.value = 'Khách lẻ';
+    delete form.dataset.id;
+    await loadAll();
+  } catch (error) {
+    alert(error.message);
+  }
 });
 
 qs('#order-form').addEventListener('submit', async (event) => {
   event.preventDefault();
-  await api.send('/api/orders', 'POST', formData(event.currentTarget));
-  event.currentTarget.reset();
-  await loadAll();
+  try {
+    await api.send('/api/orders', 'POST', formData(event.currentTarget));
+    event.currentTarget.reset();
+    await loadAll();
+  } catch (error) {
+    alert(error.message);
+  }
 });
 
 qs('#contact-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const body = formData(event.currentTarget);
-  await api.send(`/api/customers/${body.customerId}/debt-contacts`, 'POST', body);
-  event.currentTarget.reset();
-  await loadAll();
+  try {
+    await api.send(`/api/customers/${body.customerId}/debt-contacts`, 'POST', body);
+    event.currentTarget.reset();
+    await loadAll();
+  } catch (error) {
+    alert(error.message);
+  }
 });
 
 loadAll().catch((error) => alert(error.message));

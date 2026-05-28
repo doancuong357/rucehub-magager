@@ -1,17 +1,48 @@
 const fs = require('fs');
 const path = require('path');
+const { Pool } = require('pg');
 const sqlite3 = require('sqlite3').verbose();
 
+const usePostgres = Boolean(process.env.DATABASE_URL);
 const dataDir = path.join(__dirname, 'data');
 const dbPath = path.join(dataDir, 'ricehub.sqlite');
 
-fs.mkdirSync(dataDir, { recursive: true });
+let sqliteDb;
+let pgPool;
 
-const db = new sqlite3.Database(dbPath);
+if (usePostgres) {
+  pgPool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.PGSSLMODE === 'disable' ? false : { rejectUnauthorized: false },
+  });
+} else {
+  fs.mkdirSync(dataDir, { recursive: true });
+  sqliteDb = new sqlite3.Database(dbPath);
+}
+
+function normalizeSql(sql) {
+  if (!usePostgres) return sql;
+  let index = 0;
+  const normalized = sql
+    .replace(/CURRENT_TIMESTAMP/g, 'NOW()')
+    .replace(/INTEGER PRIMARY KEY AUTOINCREMENT/g, 'SERIAL PRIMARY KEY')
+    .replace(/\?/g, () => `$${++index}`);
+  if (/^\s*INSERT\s+/i.test(normalized) && !/\sRETURNING\s+/i.test(normalized)) {
+    return `${normalized} RETURNING id`;
+  }
+  return normalized;
+}
 
 function run(sql, params = []) {
+  if (usePostgres) {
+    return pgPool.query(normalizeSql(sql), params).then((result) => ({
+      id: result.rows?.[0]?.id,
+      changes: result.rowCount,
+    }));
+  }
+
   return new Promise((resolve, reject) => {
-    db.run(sql, params, function handleRun(error) {
+    sqliteDb.run(sql, params, function handleRun(error) {
       if (error) {
         reject(error);
         return;
@@ -22,8 +53,12 @@ function run(sql, params = []) {
 }
 
 function get(sql, params = []) {
+  if (usePostgres) {
+    return pgPool.query(normalizeSql(sql), params).then((result) => result.rows[0]);
+  }
+
   return new Promise((resolve, reject) => {
-    db.get(sql, params, (error, row) => {
+    sqliteDb.get(sql, params, (error, row) => {
       if (error) {
         reject(error);
         return;
@@ -34,8 +69,12 @@ function get(sql, params = []) {
 }
 
 function all(sql, params = []) {
+  if (usePostgres) {
+    return pgPool.query(normalizeSql(sql), params).then((result) => result.rows);
+  }
+
   return new Promise((resolve, reject) => {
-    db.all(sql, params, (error, rows) => {
+    sqliteDb.all(sql, params, (error, rows) => {
       if (error) {
         reject(error);
         return;
@@ -46,7 +85,9 @@ function all(sql, params = []) {
 }
 
 async function initDatabase() {
-  await run('PRAGMA foreign_keys = ON');
+  if (!usePostgres) {
+    await run('PRAGMA foreign_keys = ON');
+  }
 
   await run(`
     CREATE TABLE IF NOT EXISTS products (
@@ -60,8 +101,8 @@ async function initDatabase() {
       stock REAL NOT NULL DEFAULT 0,
       min_stock REAL NOT NULL DEFAULT 0,
       note TEXT NOT NULL DEFAULT '',
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
@@ -74,8 +115,8 @@ async function initDatabase() {
       customer_group TEXT NOT NULL DEFAULT 'Khách lẻ',
       debt INTEGER NOT NULL DEFAULT 0,
       note TEXT NOT NULL DEFAULT '',
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
@@ -91,7 +132,7 @@ async function initDatabase() {
       paid INTEGER NOT NULL DEFAULT 0,
       status TEXT NOT NULL DEFAULT 'Đang giao',
       note TEXT NOT NULL DEFAULT '',
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE RESTRICT,
       FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT
     )
@@ -105,17 +146,39 @@ async function initDatabase() {
       content TEXT NOT NULL DEFAULT '',
       promised_date TEXT NOT NULL DEFAULT '',
       status TEXT NOT NULL DEFAULT 'Đã liên hệ',
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
     )
   `);
 }
 
+async function transaction(callback) {
+  await run('BEGIN');
+  try {
+    const result = await callback();
+    await run('COMMIT');
+    return result;
+  } catch (error) {
+    await run('ROLLBACK');
+    throw error;
+  }
+}
+
+async function close() {
+  if (usePostgres) {
+    await pgPool.end();
+  } else {
+    sqliteDb.close();
+  }
+}
+
 module.exports = {
-  db,
   dbPath,
+  dbType: usePostgres ? 'postgres' : 'sqlite',
   initDatabase,
   run,
   get,
   all,
+  transaction,
+  close,
 };

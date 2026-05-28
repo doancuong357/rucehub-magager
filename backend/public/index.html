@@ -3,125 +3,326 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>RiceHub Manager</title>
+    <title>RiceHub Admin — Quản lý bán gạo thông minh</title>
+    <!-- Modern Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
+    <!-- Premium Glassmorphic Sidebar -->
     <aside class="sidebar">
       <div class="brand">
-        <div class="brand-icon">🌾</div>
-        <div>
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M12 2L2 22h20L12 2z" stroke-linejoin="round" stroke-linecap="round"/>
+            <path d="M12 8v8" stroke-linecap="round"/>
+            <path d="M9 14h6" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="brand-text">
           <strong>RiceHub</strong>
-          <span>Quản lí bán gạo</span>
+          <span>Hệ thống Quản lý Bán gạo</span>
         </div>
       </div>
+      
       <nav>
-        <button class="nav active" data-view="dashboard">Tổng quan</button>
-        <button class="nav" data-view="products">Mặt hàng</button>
-        <button class="nav" data-view="customers">Khách hàng</button>
-        <button class="nav" data-view="orders">Đơn bán</button>
-        <button class="nav" data-view="debts">Thu nợ</button>
+        <button class="nav active" data-view="dashboard">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+          <span>Tổng quan</span>
+        </button>
+        <button class="nav" data-view="products">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+          <span>Mặt hàng</span>
+        </button>
+        <button class="nav" data-view="customers">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span>Khách hàng</span>
+        </button>
+        <button class="nav" data-view="orders">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+          <span>Đơn bán</span>
+        </button>
+        <button class="nav" data-view="debts">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          <span>Thu nợ</span>
+        </button>
       </nav>
+      
+      <div class="sidebar-footer">
+        <span class="db-badge">⚡ Cloud Mode (Supabase)</span>
+      </div>
     </aside>
 
+    <!-- Main Container -->
     <main class="main">
       <header class="topbar">
         <div>
           <h1 id="page-title">Tổng quan</h1>
-          <p>Dữ liệu được lưu trong SQLite qua backend Express.</p>
+          <p class="subtitle">Hệ quản trị RiceHub tối ưu hiệu suất vận hành.</p>
         </div>
-        <button id="refresh" class="primary">Làm mới</button>
+        <button id="refresh" class="primary">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+          <span>Làm mới dữ liệu</span>
+        </button>
       </header>
 
+      <!-- VIEW: DASHBOARD -->
       <section id="dashboard" class="view active">
         <div class="metrics">
-          <article><span>Doanh thu</span><strong id="m-revenue">0 đ</strong></article>
-          <article><span>Công nợ</span><strong id="m-debt">0 đ</strong></article>
-          <article><span>Tồn kho</span><strong id="m-stock">0 đ</strong></article>
-          <article><span>Lợi nhuận</span><strong id="m-profit">0 đ</strong></article>
+          <article class="metric-card card-revenue">
+            <div class="metric-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            </div>
+            <div class="metric-content">
+              <span>Doanh thu đã thu</span>
+              <strong id="m-revenue">0 đ</strong>
+            </div>
+          </article>
+          
+          <article class="metric-card card-debt">
+            <div class="metric-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <div class="metric-content">
+              <span>Tổng nợ chưa thu</span>
+              <strong id="m-debt">0 đ</strong>
+            </div>
+          </article>
+          
+          <article class="metric-card card-stock">
+            <div class="metric-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l-7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+            </div>
+            <div class="metric-content">
+              <span>Giá trị tồn kho</span>
+              <strong id="m-stock">0 đ</strong>
+            </div>
+          </article>
+          
+          <article class="metric-card card-profit">
+            <div class="metric-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+            </div>
+            <div class="metric-content">
+              <span>Lợi nhuận tạm tính</span>
+              <strong id="m-profit">0 đ</strong>
+            </div>
+          </article>
         </div>
+        
         <div class="grid two">
           <section class="panel">
-            <h2>Khách đang nợ</h2>
+            <div class="panel-header">
+              <h2>Khách hàng có công nợ lớn</h2>
+              <span class="badge warning">Cần liên hệ</span>
+            </div>
             <div id="debt-customers" class="list"></div>
           </section>
+          
           <section class="panel">
-            <h2>Hàng sắp hết</h2>
+            <div class="panel-header">
+              <h2>Mặt hàng sắp hết hàng</h2>
+              <span class="badge danger">Cảnh báo tồn kho</span>
+            </div>
             <div id="low-stock" class="list"></div>
           </section>
         </div>
       </section>
 
+      <!-- VIEW: PRODUCTS -->
       <section id="products" class="view">
         <div class="panel">
-          <h2>Thêm mặt hàng</h2>
+          <div class="panel-header">
+            <h2>Quản lý & Thêm mặt hàng</h2>
+            <p class="muted">Nhập thông số mặt hàng gạo mới vào hệ thống.</p>
+          </div>
           <form id="product-form" class="form-grid">
-            <input name="name" placeholder="Tên mặt hàng" required />
-            <input name="type" placeholder="Loại gạo" />
-            <input name="origin" placeholder="Xuất xứ" />
-            <input name="unit" placeholder="Đơn vị" value="kg" />
-            <input name="price" type="number" placeholder="Giá bán" />
-            <input name="cost" type="number" placeholder="Giá vốn" />
-            <input name="stock" type="number" placeholder="Tồn kho" />
-            <input name="minStock" type="number" placeholder="Cảnh báo tồn" />
-            <input name="note" placeholder="Ghi chú" />
-            <button class="primary">Lưu mặt hàng</button>
+            <div class="form-group">
+              <label>Tên mặt hàng *</label>
+              <input name="name" placeholder="Ví dụ: Gạo ST25" required />
+            </div>
+            <div class="form-group">
+              <label>Loại gạo</label>
+              <input name="type" placeholder="Ví dụ: Gạo dẻo thơm" />
+            </div>
+            <div class="form-group">
+              <label>Xuất xứ</label>
+              <input name="origin" placeholder="Ví dụ: Sóc Trăng" />
+            </div>
+            <div class="form-group">
+              <label>Đơn vị</label>
+              <input name="unit" placeholder="Đơn vị tính" value="kg" />
+            </div>
+            <div class="form-group">
+              <label>Giá bán (đ/đơn vị)</label>
+              <input name="price" type="number" placeholder="Ví dụ: 25000" />
+            </div>
+            <div class="form-group">
+              <label>Giá vốn (đ/đơn vị)</label>
+              <input name="cost" type="number" placeholder="Ví dụ: 18000" />
+            </div>
+            <div class="form-group">
+              <label>Tồn kho hiện tại</label>
+              <input name="stock" type="number" placeholder="Ví dụ: 500" />
+            </div>
+            <div class="form-group">
+              <label>Mức cảnh báo tồn tối thiểu</label>
+              <input name="minStock" type="number" placeholder="Ví dụ: 50" />
+            </div>
+            <div class="form-group full-width">
+              <label>Ghi chú mặt hàng</label>
+              <input name="note" placeholder="Thông tin mô tả thêm..." />
+            </div>
+            <div class="form-actions">
+              <button class="primary btn-submit">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                <span>Lưu mặt hàng</span>
+              </button>
+            </div>
           </form>
+        </div>
+        
+        <div class="section-title-wrapper">
+          <h2>Danh sách mặt hàng gạo</h2>
         </div>
         <div id="products-list" class="cards"></div>
       </section>
 
+      <!-- VIEW: CUSTOMERS -->
       <section id="customers" class="view">
         <div class="panel">
-          <h2>Thêm khách hàng</h2>
+          <div class="panel-header">
+            <h2>Quản lý khách hàng</h2>
+            <p class="muted">Tạo mới hồ sơ khách hàng để theo dõi lịch sử mua hàng và nợ nần.</p>
+          </div>
           <form id="customer-form" class="form-grid">
-            <input name="name" placeholder="Tên khách hàng" required />
-            <input name="phone" placeholder="Số điện thoại" />
-            <input name="address" placeholder="Địa chỉ" />
-            <input name="group" placeholder="Nhóm khách" value="Khách lẻ" />
-            <input name="debt" type="number" placeholder="Công nợ đầu kỳ" />
-            <input name="note" placeholder="Ghi chú" />
-            <button class="primary">Lưu khách hàng</button>
+            <div class="form-group">
+              <label>Họ và tên *</label>
+              <input name="name" placeholder="Tên khách hàng..." required />
+            </div>
+            <div class="form-group">
+              <label>Số điện thoại</label>
+              <input name="phone" placeholder="Số liên hệ..." />
+            </div>
+            <div class="form-group">
+              <label>Địa chỉ thường trú</label>
+              <input name="address" placeholder="Địa chỉ giao hàng..." />
+            </div>
+            <div class="form-group">
+              <label>Nhóm phân loại</label>
+              <input name="group" placeholder="Phân nhóm..." value="Khách lẻ" />
+            </div>
+            <div class="form-group">
+              <label>Số nợ ban đầu (đ)</label>
+              <input name="debt" type="number" placeholder="Khoản nợ đầu kỳ nếu có..." />
+            </div>
+            <div class="form-group full-width">
+              <label>Ghi chú về khách hàng</label>
+              <input name="note" placeholder="Thói quen, yêu cầu giao hàng..." />
+            </div>
+            <div class="form-actions">
+              <button class="primary btn-submit">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                <span>Lưu khách hàng</span>
+              </button>
+            </div>
           </form>
+        </div>
+        
+        <div class="section-title-wrapper">
+          <h2>Danh bạ khách hàng</h2>
         </div>
         <div id="customers-list" class="cards"></div>
       </section>
 
+      <!-- VIEW: ORDERS -->
       <section id="orders" class="view">
         <div class="panel">
-          <h2>Tạo đơn bán</h2>
+          <div class="panel-header">
+            <h2>Tạo đơn bán hàng mới</h2>
+            <p class="muted">Tạo nhanh hóa đơn và cập nhật trực tiếp vào hệ thống kho & công nợ khách hàng.</p>
+          </div>
           <form id="order-form" class="form-grid">
-            <select name="customerId" required></select>
-            <select name="productId" required></select>
-            <input name="quantity" type="number" placeholder="Số lượng" required />
-            <input name="paid" type="number" placeholder="Đã thu" />
-            <input name="note" placeholder="Ghi chú" />
-            <button class="primary">Lưu đơn</button>
+            <div class="form-group">
+              <label>Khách hàng *</label>
+              <select name="customerId" required></select>
+            </div>
+            <div class="form-group">
+              <label>Mặt hàng gạo *</label>
+              <select name="productId" required></select>
+            </div>
+            <div class="form-group">
+              <label>Số lượng bán (kg)</label>
+              <input name="quantity" type="number" placeholder="Nhập số lượng..." required />
+            </div>
+            <div class="form-group">
+              <label>Số tiền khách trả trước (đ)</label>
+              <input name="paid" type="number" placeholder="Để trống nếu ghi nợ 100%..." />
+            </div>
+            <div class="form-group full-width">
+              <label>Ghi chú đơn hàng</label>
+              <input name="note" placeholder="Địa chỉ ship, giờ giao..." />
+            </div>
+            <div class="form-actions">
+              <button class="primary btn-submit">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                <span>Lưu đơn & Xuất kho</span>
+              </button>
+            </div>
           </form>
+        </div>
+        
+        <div class="section-title-wrapper">
+          <h2>Nhật ký đơn bán hàng</h2>
         </div>
         <div id="orders-list" class="cards"></div>
       </section>
 
+      <!-- VIEW: DEBTS -->
       <section id="debts" class="view">
         <div class="grid two">
           <section class="panel">
-            <h2>Liên hệ thu nợ</h2>
+            <div class="panel-header">
+              <h2>Ghi nhận lịch sử đòi nợ</h2>
+              <p class="muted">Lưu lại các cuộc trao đổi đòi nợ để tiện theo dõi tiến trình.</p>
+            </div>
             <form id="contact-form" class="stack">
-              <select name="customerId" required></select>
-              <select name="method">
-                <option>Gọi điện</option>
-                <option>SMS</option>
-                <option>Zalo</option>
-                <option>Gặp trực tiếp</option>
-              </select>
-              <input name="promisedDate" type="date" />
-              <textarea name="content" placeholder="Nội dung trao đổi"></textarea>
-              <button class="primary">Ghi lịch sử liên hệ</button>
+              <div class="form-group">
+                <label>Khách hàng cần thu nợ *</label>
+                <select name="customerId" required></select>
+              </div>
+              <div class="form-group">
+                <label>Hình thức liên hệ</label>
+                <select name="method">
+                  <option>Gọi điện</option>
+                  <option>SMS</option>
+                  <option>Zalo</option>
+                  <option>Gặp trực tiếp</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Ngày hẹn trả tiền</label>
+                <input name="promisedDate" type="date" />
+              </div>
+              <div class="form-group">
+                <label>Chi tiết cuộc gọi / cam kết</label>
+                <textarea name="content" placeholder="Khách hứa ngày nào chuyển khoản, lý do chậm trễ..."></textarea>
+              </div>
+              <button class="primary btn-submit">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                <span>Lưu nhật ký liên hệ</span>
+              </button>
             </form>
           </section>
+          
           <section class="panel">
-            <h2>Lịch sử liên hệ</h2>
-            <div id="contacts-list" class="list"></div>
+            <div class="panel-header">
+              <h2>Lịch sử liên hệ đòi nợ gần đây</h2>
+              <p class="muted">Nhật ký theo dõi các cam kết thanh toán công nợ.</p>
+            </div>
+            <div id="contacts-list" class="list scrollable"></div>
           </section>
         </div>
       </section>

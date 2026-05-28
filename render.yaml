@@ -2,10 +2,9 @@ services:
   - type: web
     name: ricehub-manager
     env: docker
-    plan: starter
+    plan: free
     autoDeploy: true
-    disk:
-      name: ricehub-data
-      mountPath: /app/backend/data
-      sizeGB: 1
     healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        placeholder: "Ví dụ: postgres://postgres.yourdb:password@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?sslmode=require"

@@ -3,11 +3,13 @@ const express = require('express');
 const path = require('path');
 const {
   all,
-  db,
   dbPath,
+  dbType,
+  close,
   get,
   initDatabase,
   run,
+  transaction,
 } = require('./database');
 
 const app = express();
@@ -121,7 +123,11 @@ async function createOrderCode() {
 }
 
 app.get('/health', async (_req, res) => {
-  res.json({ ok: true, database: dbPath });
+  res.json({
+    ok: true,
+    database: dbType === 'postgres' ? 'Supabase PostgreSQL' : dbPath,
+    dbType,
+  });
 });
 
 app.get('/api/summary', async (_req, res, next) => {
@@ -155,10 +161,10 @@ app.get('/api/summary', async (_req, res, next) => {
       ]);
 
     res.json({
-      revenue: revenueRow.value,
-      debt: debtRow.value,
-      inventoryValue: inventoryRow.value,
-      profit: profitRow.value,
+      revenue: Number(revenueRow?.value || 0),
+      debt: Number(debtRow?.value || 0),
+      inventoryValue: Number(inventoryRow?.value || 0),
+      profit: Number(profitRow?.value || 0),
       lowStock: lowStock.map(mapProduct),
       pendingOrders: pendingOrders.map(mapOrder),
       debtCustomers: debtCustomers.map(mapCustomer),
@@ -264,7 +270,7 @@ app.delete('/api/products/:id', async (req, res, next) => {
     }
     res.status(204).send();
   } catch (error) {
-    if (error.code === 'SQLITE_CONSTRAINT') {
+    if (error.code === 'SQLITE_CONSTRAINT' || error.code === '23503') {
       res.status(409).json({ message: 'Mặt hàng đã có đơn bán, không thể xóa.' });
       return;
     }
@@ -355,7 +361,7 @@ app.delete('/api/customers/:id', async (req, res, next) => {
     }
     res.status(204).send();
   } catch (error) {
-    if (error.code === 'SQLITE_CONSTRAINT') {
+    if (error.code === 'SQLITE_CONSTRAINT' || error.code === '23503') {
       res.status(409).json({ message: 'Khách hàng đã có đơn bán, không thể xóa.' });
       return;
     }
@@ -499,8 +505,7 @@ app.post('/api/orders', async (req, res, next) => {
     const code = await createOrderCode();
     const status = debt > 0 ? 'Đang giao' : 'Hoàn thành';
 
-    await run('BEGIN TRANSACTION');
-    try {
+    await transaction(async () => {
       const result = await run(
         `INSERT INTO orders
          (code, customer_id, product_id, quantity, unit_price, total, paid, status, note)
@@ -516,21 +521,18 @@ app.post('/api/orders', async (req, res, next) => {
         'UPDATE customers SET debt = debt + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
         [debt, customerId],
       );
-      await run('COMMIT');
+      return result;
+    });
 
-      const row = await get(
-        `SELECT orders.*, customers.name AS customer_name, products.name AS product_name
-         FROM orders
-         JOIN customers ON customers.id = orders.customer_id
-         JOIN products ON products.id = orders.product_id
-         WHERE orders.id = ?`,
-        [result.id],
-      );
-      res.status(201).json(mapOrder(row));
-    } catch (error) {
-      await run('ROLLBACK');
-      throw error;
-    }
+    const row = await get(
+      `SELECT orders.*, customers.name AS customer_name, products.name AS product_name
+       FROM orders
+       JOIN customers ON customers.id = orders.customer_id
+       JOIN products ON products.id = orders.product_id
+       WHERE orders.code = ?`,
+      [code],
+    );
+    res.status(201).json(mapOrder(row));
   } catch (error) {
     next(error);
   }
@@ -572,6 +574,6 @@ initDatabase()
   })
   .catch((error) => {
     console.error('Cannot initialize database:', error);
-    db.close();
+    close();
     process.exit(1);
   });
