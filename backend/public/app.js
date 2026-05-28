@@ -342,15 +342,9 @@ window.markOrderDone = async (id) => {
   try {
     const order = state.orders.find((o) => o.id === id);
     if (!order) return;
-    const unpaid = Math.max(order.total - order.paid, 0);
     
-    // 1. Cập nhật trạng thái đơn hàng thành 'Hoàn thành'
+    // Cập nhật trạng thái đơn thành 'Hoàn thành' (Phía máy chủ tự động thu đủ tiền và giảm nợ cho khách hàng)
     await api.send(`/api/orders/${id}/status`, 'PUT', { status: 'Hoàn thành' });
-    
-    // 2. Đồng thời giảm trừ nợ của khách hàng đó
-    if (unpaid > 0) {
-      await api.send(`/api/customers/${order.customerId}/payments`, 'POST', { amount: unpaid });
-    }
     
     await loadAll();
   } catch (error) {

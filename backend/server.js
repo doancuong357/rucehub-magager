@@ -139,13 +139,14 @@ app.get('/api/summary', async (_req, res, next) => {
   try {
     const [revenueRow, debtRow, inventoryRow, profitRow, lowStock, pendingOrders, debtCustomers] =
       await Promise.all([
-        get('SELECT COALESCE(SUM(paid), 0) AS value FROM orders'),
+        get("SELECT COALESCE(SUM(paid), 0) AS value FROM orders WHERE status != 'Đã hủy'"),
         get('SELECT COALESCE(SUM(debt), 0) AS value FROM customers'),
         get('SELECT COALESCE(SUM(stock * cost), 0) AS value FROM products'),
         get(`
           SELECT COALESCE(SUM((orders.unit_price - products.cost) * orders.quantity), 0) AS value
           FROM orders
           JOIN products ON products.id = orders.product_id
+          WHERE orders.status != 'Đã hủy'
         `),
         all('SELECT * FROM products WHERE stock <= min_stock ORDER BY stock ASC'),
         all(`
@@ -153,7 +154,7 @@ app.get('/api/summary', async (_req, res, next) => {
           FROM orders
           JOIN customers ON customers.id = orders.customer_id
           JOIN products ON products.id = orders.product_id
-          WHERE orders.status != 'Hoàn thành'
+          WHERE orders.status != 'Hoàn thành' AND orders.status != 'Đã hủy'
           ORDER BY orders.created_at DESC
           LIMIT 6
         `),
@@ -545,12 +546,67 @@ app.post('/api/orders', async (req, res, next) => {
 
 app.put('/api/orders/:id/status', async (req, res, next) => {
   try {
-    const status = cleanText(req.body.status) || 'Đang giao';
-    const result = await run('UPDATE orders SET status = ? WHERE id = ?', [status, req.params.id]);
-    if (!result.changes) {
+    const nextStatus = cleanText(req.body.status) || 'Đang giao';
+    
+    // 1. Lấy thông tin đơn hàng hiện tại
+    const order = await get('SELECT * FROM orders WHERE id = ?', [req.params.id]);
+    if (!order) {
       res.status(404).json({ message: 'Không tìm thấy đơn hàng.' });
       return;
     }
+
+    // 2. Nếu trạng thái cũ đã là 'Đã hủy', khóa không cho phép thay đổi nữa
+    if (order.status === 'Đã hủy') {
+      res.status(400).json({ message: 'Đơn hàng đã hủy không thể thay đổi trạng thái.' });
+      return;
+    }
+
+    // 3. Nếu trạng thái mới trùng với trạng thái cũ, trả về thông tin luôn
+    if (order.status === nextStatus) {
+      const row = await get(
+        `SELECT orders.*, customers.name AS customer_name, products.name AS product_name
+         FROM orders
+         JOIN customers ON customers.id = orders.customer_id
+         JOIN products ON products.id = orders.product_id
+         WHERE orders.id = ?`,
+        [req.params.id],
+      );
+      res.json(mapOrder(row));
+      return;
+    }
+
+    // 4. Thực hiện nghiệp vụ cập nhật trạng thái trong Transaction để đảm bảo tính đồng bộ dữ liệu
+    await transaction(async () => {
+      if (nextStatus === 'Hoàn thành') {
+        const unpaid = Math.max(order.total - order.paid, 0);
+        
+        // Cập nhật đơn hàng thành Hoàn thành và đã thu đủ tiền
+        await run('UPDATE orders SET status = ?, paid = total, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [nextStatus, req.params.id]);
+        
+        // Giảm trừ nợ của khách hàng tương ứng với phần chưa thanh toán của đơn này
+        if (unpaid > 0) {
+          await run('UPDATE customers SET debt = debt - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [unpaid, order.customer_id]);
+        }
+      } else if (nextStatus === 'Đã hủy') {
+        const unpaid = Math.max(order.total - order.paid, 0);
+
+        // Trả lại tồn kho của sản phẩm
+        await run('UPDATE products SET stock = stock + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [order.quantity, order.product_id]);
+
+        // Giảm trừ phần công nợ mà đơn hàng này đã cộng vào tài khoản khách hàng (chỉ phần chưa thanh toán)
+        if (unpaid > 0) {
+          await run('UPDATE customers SET debt = debt - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [unpaid, order.customer_id]);
+        }
+
+        // Cập nhật trạng thái đơn thành Đã hủy, và reset số tiền đã thanh toán của đơn này về 0 (để trừ khỏi doanh thu thực tế)
+        await run('UPDATE orders SET status = ?, paid = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [nextStatus, req.params.id]);
+      } else {
+        // Các trạng thái khác (ví dụ: Đang giao)
+        await run('UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [nextStatus, req.params.id]);
+      }
+    });
+
+    // 5. Lấy lại thông tin đơn hàng sau cập nhật kèm tên khách và tên sản phẩm để phản hồi
     const row = await get(
       `SELECT orders.*, customers.name AS customer_name, products.name AS product_name
        FROM orders
