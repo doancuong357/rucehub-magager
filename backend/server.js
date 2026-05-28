@@ -420,7 +420,7 @@ app.post('/api/customers/:id/payments', async (req, res, next) => {
         const newStatus = newPaid >= order.total ? 'Hoàn thành' : order.status;
 
         await run(
-          'UPDATE orders SET paid = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+          'UPDATE orders SET paid = ?, status = ? WHERE id = ?',
           [newPaid, newStatus, order.id],
         );
 
@@ -614,7 +614,7 @@ app.put('/api/orders/:id/status', async (req, res, next) => {
         const unpaid = Math.max(order.total - order.paid, 0);
         
         // Cập nhật đơn hàng thành Hoàn thành và đã thu đủ tiền
-        await run('UPDATE orders SET status = ?, paid = total, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [nextStatus, req.params.id]);
+        await run('UPDATE orders SET status = ?, paid = total WHERE id = ?', [nextStatus, req.params.id]);
         
         // Giảm trừ nợ của khách hàng tương ứng với phần chưa thanh toán của đơn này
         if (unpaid > 0) {
@@ -632,10 +632,10 @@ app.put('/api/orders/:id/status', async (req, res, next) => {
         }
 
         // Cập nhật trạng thái đơn thành Đã hủy, và reset số tiền đã thanh toán của đơn này về 0 (để trừ khỏi doanh thu thực tế)
-        await run('UPDATE orders SET status = ?, paid = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [nextStatus, req.params.id]);
+        await run('UPDATE orders SET status = ?, paid = 0 WHERE id = ?', [nextStatus, req.params.id]);
       } else {
         // Các trạng thái khác (ví dụ: Đang giao)
-        await run('UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [nextStatus, req.params.id]);
+        await run('UPDATE orders SET status = ? WHERE id = ?', [nextStatus, req.params.id]);
       }
     });
 

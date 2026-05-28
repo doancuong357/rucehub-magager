@@ -455,9 +455,10 @@ qs('#customer-form').addEventListener('submit', async (event) => {
 
 qs('#order-form').addEventListener('submit', async (event) => {
   event.preventDefault();
+  const form = event.currentTarget;
   try {
-    await api.send('/api/orders', 'POST', formData(event.currentTarget));
-    event.currentTarget.reset();
+    await api.send('/api/orders', 'POST', formData(form));
+    form.reset();
     await loadAll();
   } catch (error) {
     alert(error.message);
@@ -466,10 +467,11 @@ qs('#order-form').addEventListener('submit', async (event) => {
 
 qs('#contact-form').addEventListener('submit', async (event) => {
   event.preventDefault();
-  const body = formData(event.currentTarget);
+  const form = event.currentTarget;
+  const body = formData(form);
   try {
     await api.send(`/api/customers/${body.customerId}/debt-contacts`, 'POST', body);
-    event.currentTarget.reset();
+    form.reset();
     await loadAll();
   } catch (error) {
     alert(error.message);
